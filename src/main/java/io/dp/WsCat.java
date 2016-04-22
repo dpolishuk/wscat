@@ -2,25 +2,21 @@ package io.dp;
 
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
+import com.squareup.okhttp.RequestBody;
 import com.squareup.okhttp.Response;
+import com.squareup.okhttp.ResponseBody;
 import com.squareup.okhttp.ws.WebSocket;
 import com.squareup.okhttp.ws.WebSocketCall;
 import com.squareup.okhttp.ws.WebSocketListener;
-
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
-
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import okio.Buffer;
-import okio.BufferedSource;
-import okio.Okio;
+import okio.ByteString;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
 
 /**
  * Created by dp on 07/04/15.
@@ -54,34 +50,27 @@ public class WsCat {
       WebSocketCall call = WebSocketCall.create(httpClient, r);
 
       call.enqueue(new WebSocketListener() {
-        @Override
-        public void onOpen(WebSocket webSocket, Request request, Response response)
-            throws IOException {
+        public void onOpen(WebSocket webSocket, Response response) {
           WsCat.this.webSocket = webSocket;
           System.out.println("opened webscoket with " + url);
         }
 
-        @Override
-        public void onMessage(BufferedSource payload, WebSocket.PayloadType type)
-            throws IOException {
-          System.out.println("payload " + payload.readUtf8());
+        public void onFailure(IOException e, Response response) {
+          System.err.println(e);
+          doExit.set(true);
         }
 
-        @Override
+        public void onMessage(ResponseBody message) throws IOException {
+          System.out.println("payload " + message.string());
+        }
+
         public void onPong(Buffer payload) {
 
         }
 
-        @Override
         public void onClose(int code, String reason) {
           System.out.println("closed webscoket with " + url);
           WsCat.this.webSocket = null;
-          doExit.set(true);
-        }
-
-        @Override
-        public void onFailure(IOException e) {
-          System.err.println(e);
           doExit.set(true);
         }
       });
@@ -92,8 +81,9 @@ public class WsCat {
         String msg = scanner.nextLine();
 
         if (webSocket != null) {
-          InputStream is = new ByteArrayInputStream(msg.getBytes());
-          webSocket.sendMessage(WebSocket.PayloadType.TEXT, Okio.buffer(Okio.source(is)).buffer());
+
+          RequestBody body = RequestBody.create(WebSocket.TEXT, ByteString.of(msg.getBytes()));
+          webSocket.sendMessage(body);
         }
       }
 
